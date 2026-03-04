@@ -138,6 +138,18 @@ def _build_parser() -> argparse.ArgumentParser:
             "GH_TOKEN environment variable (handled by the SDK automatically)."
         ),
     )
+    auth.add_argument(
+        "--git-username",
+        default=None,
+        metavar="USERNAME",
+        help=(
+            "Git username paired with --pat for HTTPS authentication "
+            "(produces https://<username>:<pat>@host/...).  "
+            "GitHub: use 'x-access-token' or your GitHub login.  "
+            "Azure DevOps: use your Azure AD username.  "
+            "Omit to use the PAT alone as the credential."
+        ),
+    )
 
     # Optional — Copilot SDK
     sdk = parser.add_argument_group("copilot sdk")
@@ -252,6 +264,7 @@ def main() -> None:
         repo_url=args.repo,
         branch=args.branch,
         pat=args.pat,
+        git_username=args.git_username or None,
         model=args.model or None,    # treat "auto" as None inside the engine
         github_token=args.github_token,
         allowed_rules=allowed_rules,

@@ -35,6 +35,17 @@ on:
 
       # ── Optional — Copilot SDK ───────────────────────────────────────────────
 
+      git_username:
+        description: >
+          [OPTIONAL] Git username paired with the GH_PAT secret for HTTPS
+          clone authentication (produces https://<username>:<pat>@host/...).
+          GitHub: use 'x-access-token' or your GitHub login.
+          Azure DevOps: use your Azure AD / org username.
+          Leave blank to use the PAT alone as the credential (default GitHub behavior).
+        required: false
+        type: string
+        default: ''
+
       model:
         description: >
           [OPTIONAL] Copilot model identifier.
@@ -186,6 +197,11 @@ jobs:
             --log-level "${{ inputs.log_level }}"
             --timeout "${{ inputs.timeout }}"
           )
+
+          # Optional: git username for HTTPS clone auth
+          if [[ -n "${{ inputs.git_username }}" ]]; then
+            ARGS+=(--git-username "${{ inputs.git_username }}")
+          fi
 
           # Optional: Copilot model
           if [[ -n "${{ inputs.model }}" ]]; then

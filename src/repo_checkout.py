@@ -41,16 +41,21 @@ from git import GitCommandError, InvalidGitRepositoryError, Repo
 # Helpers
 # ---------------------------------------------------------------------------
 
-def inject_pat_into_url(repo_url: str, pat: str) -> str:
+def inject_pat_into_url(repo_url: str, pat: str, username: str | None = None) -> str:
     """
-    Embed a PAT token into an HTTPS remote URL so that git can authenticate
-    without an interactive prompt.
+    Embed a PAT token (and optional username) into an HTTPS remote URL so that
+    git can authenticate without an interactive prompt.
+
+    Format produced
+    ---------------
+    With username : ``https://<username>:<pat>@host/path``
+    Without       : ``https://<pat>@host/path``
 
     Examples
     --------
-    GitHub  : https://<pat>@github.com/org/repo.git
-    Azure DO: https://<pat>@dev.azure.com/org/project/_git/repo
-    Generic : https://<pat>@host/path
+    GitHub (token only) : https://x-access-token:<pat>@github.com/org/repo.git
+    GitHub (user + PAT) : https://alice:<pat>@github.com/org/repo.git
+    Azure DevOps        : https://alice:<pat>@dev.azure.com/org/project/_git/repo
     """
     parsed = urlparse(repo_url)
 
@@ -64,7 +69,9 @@ def inject_pat_into_url(repo_url: str, pat: str) -> str:
     if parsed.port:
         netloc_without_creds = f"{netloc_without_creds}:{parsed.port}"
 
-    authenticated_netloc = f"{pat}@{netloc_without_creds}"
+    # Build  username:pat  or  pat  depending on whether a username was supplied
+    credentials = f"{username}:{pat}" if username else pat
+    authenticated_netloc = f"{credentials}@{netloc_without_creds}"
 
     authenticated_url = urlunparse(
         (
@@ -154,6 +161,7 @@ def checkout_repo(
     branch: str,
     pat: str | None = None,
     workdir: Path | None = None,
+    git_username: str | None = None,
 ) -> tuple[Path, str]:
     """
     Clone *repo_url* at *branch* into *workdir*, optionally using *pat* for auth.
@@ -174,6 +182,10 @@ def checkout_repo(
         HTTPS URL so the clone is non-interactive.
     workdir : Path | None
         Root working directory.  Defaults to <project_root>/workdir.
+    git_username : str | None
+        Git username to pair with the PAT (e.g. ``"x-access-token"`` for
+        GitHub, or an Azure DevOps username).  When ``None`` the PAT is used
+        as the credential on its own (``https://<pat>@host/...``).
 
     Returns
     -------
@@ -189,8 +201,8 @@ def checkout_repo(
 
     workdir.mkdir(parents=True, exist_ok=True)
 
-    # Determine the effective URL (with PAT if supplied)
-    effective_url = inject_pat_into_url(repo_url, pat) if pat else repo_url
+    # Determine the effective URL (with PAT / username if supplied)
+    effective_url = inject_pat_into_url(repo_url, pat, username=git_username) if pat else repo_url
     display_url = safe_display_url(effective_url)
 
     target_dir = resolve_clone_target(workdir, repo_url)

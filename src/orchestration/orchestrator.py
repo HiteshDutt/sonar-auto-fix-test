@@ -106,6 +106,11 @@ class OrchestratorConfig:
     workdir: Optional[Path] = None
     """Root directory for cloned repos.  Defaults to ``<project_root>/workdir``."""
 
+    git_username: Optional[str] = None
+    """Git username paired with *pat* for HTTPS clone authentication.
+    Examples: ``"x-access-token"`` (GitHub), ``"myuser"`` (Azure DevOps).
+    When ``None`` the PAT alone is used as the credential."""
+
     issue_timeout: float = 300.0
     """Seconds to wait for the Copilot agent per issue (default 5 min)."""
 
@@ -204,6 +209,7 @@ class Orchestrator:
             branch=cfg.branch,
             pat=cfg.pat,
             workdir=cfg.workdir,
+            git_username=cfg.git_username,
         )
         logger.info(
             "[Step 2/3] Repository cloned at '%s'; target branch '%s' checked out; "
