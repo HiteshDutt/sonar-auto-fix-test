@@ -1,0 +1,220 @@
+name: Sonar Auto-Fix
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Manually triggered.  All CLI inputs are exposed as workflow inputs.
+# Secrets (GH_PAT, COPILOT_GITHUB_TOKEN) are read from repository / environment
+# secrets — they are never accepted as plain inputs and never echoed.
+# ──────────────────────────────────────────────────────────────────────────────
+on:
+  workflow_dispatch:
+    inputs:
+
+      # ── Required ────────────────────────────────────────────────────────────
+
+      excel_url:
+        description: >
+          [REQUIRED] HTTPS URL of the SonarQube Excel export (.xlsx).
+          Use an Azure Blob SAS URL or any authenticated download link.
+          The URL is masked immediately and never logged.
+        required: true
+        type: string
+
+      repo:
+        description: >
+          [REQUIRED] HTTPS clone URL of the target repository
+          (e.g. https://github.com/org/repo.git).
+        required: true
+        type: string
+
+      branch:
+        description: >
+          [REQUIRED] Git branch to check out, fix, and target as the
+          Pull Request base (e.g. main, dev).
+        required: true
+        type: string
+
+      # ── Optional — Copilot SDK ───────────────────────────────────────────────
+
+      model:
+        description: >
+          [OPTIONAL] Copilot model identifier.
+          Leave blank to use the model configured in the Copilot CLI (auto).
+          Examples: claude-sonnet-4-5, gpt-4o.
+        required: false
+        type: string
+        default: ''
+
+      timeout:
+        description: >
+          [OPTIONAL] Per-issue Copilot agent timeout in seconds (default: 300).
+        required: false
+        type: string
+        default: '300'
+
+      # ── Optional — Filtering ─────────────────────────────────────────────────
+
+      rules:
+        description: >
+          [OPTIONAL] Comma-separated SonarQube rule keys to process.
+          Leave blank to process all rules in the workbook.
+          Example: csharpsquid:S1118,csharpsquid:S6966
+        required: false
+        type: string
+        default: ''
+
+      severity:
+        description: >
+          [OPTIONAL] Minimum severity threshold.
+          Issues below this level are skipped.
+          Leave blank to process all severities.
+        required: false
+        type: choice
+        options:
+          - ''
+          - INFO
+          - MINOR
+          - MAJOR
+          - CRITICAL
+          - BLOCKER
+        default: ''
+
+      # ── Optional — Pull Request ──────────────────────────────────────────────
+
+      pr_title:
+        description: >
+          [OPTIONAL] Custom Pull Request title.
+          Auto-generated when left blank.
+        required: false
+        type: string
+        default: ''
+
+      pr_body:
+        description: >
+          [OPTIONAL] Custom Pull Request body (Markdown).
+          Auto-generated when left blank.
+        required: false
+        type: string
+        default: ''
+
+      # ── Optional — Diagnostics ───────────────────────────────────────────────
+
+      log_level:
+        description: >
+          [OPTIONAL] Python logging verbosity (default: INFO).
+        required: false
+        type: choice
+        options:
+          - INFO
+          - DEBUG
+          - WARNING
+          - ERROR
+        default: INFO
+
+# Only one run of this workflow at a time to avoid conflicting PRs
+concurrency:
+  group: sonar-autofix-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fix-issues:
+    name: Run Sonar Auto-Fix Pipeline
+    runs-on: ubuntu-latest
+
+    # Limit job runtime — prevents runaway Copilot sessions consuming minutes
+    timeout-minutes: 120
+
+    steps:
+
+      # ── 1. Mask all secrets & the Excel URL immediately ─────────────────────
+      #       Nothing sensitive will appear in the log from this point on.
+      - name: Mask secrets and sensitive inputs
+        shell: bash
+        run: |
+          # Mask the Excel URL — may contain a SAS token
+          echo "::add-mask::${{ inputs.excel_url }}"
+          # Mask GitHub tokens injected from repository secrets
+          echo "::add-mask::${{ secrets.GH_PAT }}"
+          echo "::add-mask::${{ secrets.COPILOT_GITHUB_TOKEN }}"
+
+      # ── 2. Checkout this repo (contains the sonar_autofix source) ───────────
+      - name: Checkout sonar-autofix source
+        uses: actions/checkout@v4
+
+      # ── 3. Set up Python ────────────────────────────────────────────────────
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # ── 4. Install Python dependencies ──────────────────────────────────────
+      - name: Install dependencies
+        run: pip install --quiet -r requirements.txt
+
+      # ── 5. Authenticate GitHub CLI (required by the Copilot SDK) ────────────
+      - name: Authenticate GitHub CLI
+        env:
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN || secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+        run: gh auth status
+
+      # ── 6. Download the Excel export ─────────────────────────────────────────
+      #       Stored in a temp file; path is NOT echoed.
+      - name: Download SonarQube Excel export
+        shell: bash
+        run: |
+          curl --silent --show-error --fail --location \
+               --output /tmp/sonar_issues.xlsx \
+               "${{ inputs.excel_url }}"
+
+      # ── 7. Build CLI argument list and run the pipeline ─────────────────────
+      #       Conditional flags: only appended when the input is non-empty.
+      #       Secret values passed via environment variables — never on the
+      #       command line where they could appear in ps/log output.
+      - name: Run Sonar Auto-Fix pipeline
+        env:
+          # Secrets injected as env vars; read by orchestrator token resolution
+          GITHUB_PAT:          ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN:        ${{ secrets.COPILOT_GITHUB_TOKEN || secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ARGS=(
+            --excel   /tmp/sonar_issues.xlsx
+            --repo    "${{ inputs.repo }}"
+            --branch  "${{ inputs.branch }}"
+            --log-level "${{ inputs.log_level }}"
+            --timeout "${{ inputs.timeout }}"
+          )
+
+          # Optional: Copilot model
+          if [[ -n "${{ inputs.model }}" ]]; then
+            ARGS+=(--model "${{ inputs.model }}")
+          fi
+
+          # Optional: rule filter
+          if [[ -n "${{ inputs.rules }}" ]]; then
+            ARGS+=(--rules "${{ inputs.rules }}")
+          fi
+
+          # Optional: severity threshold
+          if [[ -n "${{ inputs.severity }}" ]]; then
+            ARGS+=(--severity "${{ inputs.severity }}")
+          fi
+
+          # Optional: PR title
+          if [[ -n "${{ inputs.pr_title }}" ]]; then
+            ARGS+=(--pr-title "${{ inputs.pr_title }}")
+          fi
+
+          # Optional: PR body
+          if [[ -n "${{ inputs.pr_body }}" ]]; then
+            ARGS+=(--pr-body "${{ inputs.pr_body }}")
+          fi
+
+          python src/sonar_autofix.py "${ARGS[@]}"
+
+      # ── 8. Clean up the downloaded Excel file ────────────────────────────────
+      - name: Clean up temporary files
+        if: always()
+        run: rm -f /tmp/sonar_issues.xlsx

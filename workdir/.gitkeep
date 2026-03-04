@@ -1,0 +1,2 @@
+# This file keeps the workdir folder tracked by git.
+# All content cloned into this directory is ignored via .gitignore.

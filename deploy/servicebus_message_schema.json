@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/hidutt_microsoft/sonar-autofix/servicebus-message",
+  "title": "SonarAutoFixJobMessage",
+  "description": "Payload published to the Azure Service Bus queue to trigger one Sonar Auto-Fix pipeline run.",
+  "type": "object",
+  "required": ["excel_url", "repo", "branch"],
+  "additionalProperties": false,
+  "properties": {
+    "excel_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "HTTP/HTTPS URL of the SonarQube Excel export (.xlsx). Use an Azure Blob SAS URL or any publicly/privately accessible URL. The container downloads the file at runtime."
+    },
+    "repo": {
+      "type": "string",
+      "format": "uri",
+      "description": "HTTPS clone URL of the target Git repository (e.g. https://github.com/org/repo.git)."
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Git branch to check out, fix, and target as the Pull Request base (e.g. 'main', 'dev')."
+    },
+    "pat": {
+      "type": "string",
+      "description": "GitHub Personal Access Token for push and PR creation. SECURITY: prefer setting GITHUB_PAT as an environment variable via Key Vault reference instead of including it in the message."
+    },
+    "github_token": {
+      "type": "string",
+      "description": "GitHub token for the Copilot SDK. Defaults to 'pat' when omitted. SECURITY: prefer GITHUB_TOKEN env var via Key Vault reference."
+    },
+    "model": {
+      "type": "string",
+      "default": "auto",
+      "examples": ["auto", "claude-sonnet-4-5", "gpt-4o"],
+      "description": "Copilot SDK model identifier. Omit or set to 'auto' to use the model configured in the Copilot CLI."
+    },
+    "rules": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": { "type": "string" },
+          "examples": [["csharpsquid:S1118", "csharpsquid:S6966"]]
+        },
+        {
+          "type": "string",
+          "description": "Comma-separated rule keys, e.g. 'csharpsquid:S1118,csharpsquid:S6966'."
+        }
+      ],
+      "description": "SonarQube rule key(s) to process. Omit to process all rules found in the Excel export."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["INFO", "MINOR", "MAJOR", "CRITICAL", "BLOCKER"],
+      "description": "Minimum severity threshold. Issues below this level are skipped. Omit to process all severities."
+    },
+    "pr_title": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "Custom Pull Request title. Auto-generated when omitted."
+    },
+    "pr_body": {
+      "type": "string",
+      "description": "Custom Pull Request body (Markdown). Auto-generated when omitted."
+    },
+    "timeout": {
+      "type": "number",
+      "minimum": 30,
+      "maximum": 3600,
+      "default": 300,
+      "description": "Per-issue Copilot agent timeout in seconds. Default: 300 (5 min)."
+    },
+    "log_level": {
+      "type": "string",
+      "enum": ["DEBUG", "INFO", "WARNING", "ERROR"],
+      "default": "INFO",
+      "description": "Python logging level for the job run."
+    }
+  },
+  "examples": [
+    {
+      "_comment": "Minimal — secrets come from Container Apps Job env vars (Key Vault)",
+      "excel_url": "https://mystorageaccount.blob.core.windows.net/exports/DOTNET_PROJECT_main.xlsx?sv=2023-01-03&sr=b&sig=...&se=2026-04-01T00%3A00%3A00Z&sp=r",
+      "repo": "https://github.com/myorg/sonar_target_repo.git",
+      "branch": "dev"
+    },
+    {
+      "_comment": "Full example with all optional fields",
+      "excel_url": "https://mystorageaccount.blob.core.windows.net/exports/DOTNET_PROJECT_main.xlsx?sv=2023-01-03&sr=b&sig=...&se=2026-04-01T00%3A00%3A00Z&sp=r",
+      "repo": "https://github.com/myorg/sonar_target_repo.git",
+      "branch": "dev",
+      "model": "claude-sonnet-4-5",
+      "rules": ["csharpsquid:S1118", "csharpsquid:S6966"],
+      "severity": "MINOR",
+      "pr_title": "fix(sonar): automated Copilot fixes [csharpsquid:S1118, S6966]",
+      "timeout": 600,
+      "log_level": "INFO"
+    }
+  ]
+}

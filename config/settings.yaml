@@ -1,0 +1,80 @@
+# =============================================================================
+# config/settings.yaml
+#
+# Default settings for the Sonar Auto-Fix Platform.
+# Values here can be overridden by CLI arguments.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# GitHub Copilot SDK settings
+# ---------------------------------------------------------------------------
+copilot:
+  # Model to use for code-fix sessions.
+  # "auto" (or an empty value) defers to whatever model is configured via
+  # `copilot` CLI / `gh auth` / COPILOT_GITHUB_TOKEN.
+  # Explicit examples: "claude-sonnet-4-5", "gpt-4o", "gpt-4-turbo"
+  model: auto
+
+  # Maximum seconds the platform will wait for the agent to finish processing
+  # a single issue before marking it as FAILED and moving on.
+  issue_timeout_seconds: 300
+
+# ---------------------------------------------------------------------------
+# Issue filtering
+# ---------------------------------------------------------------------------
+filtering:
+  # Minimum SonarQube severity level to attempt a fix.
+  # Accepted values (case-insensitive): INFO | MINOR | MAJOR | CRITICAL | BLOCKER
+  # Issues with a lower severity are recorded as SKIPPED.
+  severity_threshold: MINOR
+
+  # Explicit list of SonarQube rule keys to fix.
+  # Leave empty (or remove the key) to process ALL rules present in the workbook.
+  # Example:
+  #   allowed_rules:
+  #     - cs-S1006
+  #     - cs-S1110
+  #     - cs-S1116
+  allowed_rules: []
+
+  # Issue status values that are considered actionable.
+  # Standard values: OPEN | CONFIRMED | ACCEPTED | RESOLVED | CLOSED
+  open_statuses:
+    - OPEN
+    - CONFIRMED
+    - ACCEPTED
+
+# ---------------------------------------------------------------------------
+# Git / repository settings
+# ---------------------------------------------------------------------------
+git:
+  # Default working directory for cloned repositories.
+  # Relative paths are resolved from the project root.
+  workdir: ./workdir
+
+  # When true, shallow-clone the repository (--depth 1) to speed up cloning.
+  # Set to false if the fix requires full history (e.g. git blame context).
+  shallow_clone: true
+
+# ---------------------------------------------------------------------------
+# Pull Request settings
+# ---------------------------------------------------------------------------
+pull_request:
+  # Override the auto-generated PR title.  Leave empty to use the default.
+  title: ""
+
+  # Override the auto-generated PR body (Markdown).  Leave empty to use the default.
+  body: ""
+
+  # Labels to apply to the created PR (GitHub only).
+  # The labels must already exist in the target repository.
+  labels:
+    - sonar-autofix
+    - automated
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging:
+  # Python log level: DEBUG | INFO | WARNING | ERROR
+  level: INFO

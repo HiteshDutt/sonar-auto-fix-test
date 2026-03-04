@@ -1,0 +1,16 @@
+# Runtime dependencies
+gitpython>=3.1.40
+requests>=2.32.0
+openpyxl>=3.1.0           # Excel workbook reading
+github-copilot-sdk>=0.1.0  # GitHub Copilot SDK for AI-powered fixes
+pyyaml>=6.0.0             # Settings / config file loading
+
+# Container job — Azure Service Bus trigger
+azure-servicebus>=7.12.0  # Receive job messages from the Service Bus queue
+azure-storage-blob>=12.19.0  # Optional: managed-identity blob download
+azure-identity>=1.17.0    # DefaultAzureCredential for managed identity
+
+# Development / testing
+pytest>=8.0.0
+pytest-mock>=3.14.0
+requests-mock>=1.12.0
