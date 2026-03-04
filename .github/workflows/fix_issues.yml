@@ -198,6 +198,17 @@ jobs:
             --timeout "${{ inputs.timeout }}"
           )
 
+          # Optional: Git PAT for authentication (passed via env var, not CLI arg)
+          if [[ -n "${{ secrets.GH_PAT }}" ]]; then
+            ARGS+=(--pat "${{ secrets.GH_PAT }}")
+          fi
+
+          # Optional: GitHub token for authentication (passed via env var, not CLI arg)
+          if [[ -n "${{ secrets.COPILOT_GITHUB_TOKEN }}" ]]; then
+            ARGS+=(--github-token "${{ secrets.COPILOT_GITHUB_TOKEN }}")
+          fi
+
+
           # Optional: git username for HTTPS clone auth
           if [[ -n "${{ inputs.git_username }}" ]]; then
             ARGS+=(--git-username "${{ inputs.git_username }}")
